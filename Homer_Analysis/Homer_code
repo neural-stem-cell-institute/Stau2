@@ -1,0 +1,66 @@
+makeTagDirectory E11-sin1/ E11-SIN1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E11-sip1/ E11-SIP1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E11-sin2/ E11-SIN2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E11-sip2/ E11-SIP2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E11-sin3/ E11-SIN3_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E11-sip3/ E11-SIP3_accepted_hits.bam -format sam -genome mm10
+
+makeTagDirectory E13-sin1/ E13-SIN1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E13-sip1/ E13-SIP1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E13-sin2/ E13-SIN2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E13-sip2/ E13-SIP2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E13-sin3/ E13-SIN3_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E13-sip3/ E13-SIP3_accepted_hits.bam -format sam -genome mm10
+
+makeTagDirectory E15-sin1/ E15-SIN1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E15-sip1/ E15-SIP1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E15-sin2/ E15-SIN2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E15-sip2/ E15-SIP2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E15-sin3/ E15-SIN3_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E15-sip3/ E15-SIP3_accepted_hits.bam -format sam -genome mm10
+
+makeTagDirectory E17-sin1/ E17-SIN1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E17-sip1/ E17-SIP1_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E17-sin2/ E17-SIN2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E17-sip2/ E17-SIP2_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E17-sin3/ E17-SIN3_accepted_hits.bam -format sam -genome mm10
+makeTagDirectory E17-sip3/ E17-SIP3_accepted_hits.bam -format sam -genome mm10
+
+findPeaks E11-sip1/ -style factor -o auto -i E11-sin1/
+findPeaks E11-sip2/ -style factor -o auto -i E11-sin2/
+findPeaks E11-sip3/ -style factor -o auto -i E11-sin3/
+findPeaks E13-sip1/ -style factor -o auto -i E13-sin1/
+findPeaks E13-sip2/ -style factor -o auto -i E13-sin2/
+findPeaks E13-sip3/ -style factor -o auto -i E13-sin3/
+findPeaks E15-sip1/ -style factor -o auto -i E15-sin1/
+findPeaks E15-sip2/ -style factor -o auto -i E15-sin2/
+findPeaks E15-sip3/ -style factor -o auto -i E15-sin3/
+findPeaks E17-sip1/ -style factor -o auto -i E17-sin1/
+findPeaks E17-sip2/ -style factor -o auto -i E17-sin2/
+findPeaks E17-sip3/ -style factor -o auto -i E17-sin3/
+  
+mergePeaks -d given E11-sip1/peaks.txt E11-sip2/peaks.txt E11-sip3/peaks.txt >E11.peaks.txt
+mergePeaks -d given E13-sip1/peaks.txt E13-sip2/peaks.txt E13-sip3/peaks.txt >E13.peaks.txt
+mergePeaks -d given E15-sip1/peaks.txt E15-sip2/peaks.txt E15-sip3/peaks.txt >E15.peaks.txt
+mergePeaks -d given E17-sip1/peaks.txt E17-sip2/peaks.txt E17-sip3/peaks.txt >E17.peaks.txt
+
+mergePeaks -d give E11.peaks.txt E13.peaks.txt -prefix test
+cat test_E11.peaks.txt test_E11.peaks.txt_E13.peaks.txt test_E13.peaks.txt > test.txt
+mergePeaks -d give test.txt E15.peaks.txt -prefix test
+cat test_test.txt test_test.txt_E15.peaks.txt test_E15.peaks.txt > test.txt
+mergePeaks -d give test.txt E17.peaks.txt -prefix test
+cat test_test.txt test_test.txt_E17.peaks.txt test_E17.peaks.txt > test.peaks.txt
+
+
+getDifferentialPeaksReplicates.pl -t E11-sip1/ E11-sip2/ E11-sip3/ -b E13-sip1/ E13-sip2/ E13-sip3/ -p test.peaks.txt -genome mm10 >E11.13.diff.txt
+getDifferentialPeaksReplicates.pl -b E11-sip1/ E11-sip2/ E11-sip3/ -t E13-sip1/ E13-sip2/ E13-sip3/ -p test.peaks.txt -genome mm10 >E13.11.diff.txt
+
+getDifferentialPeaksReplicates.pl -t E13-sip1/ E13-sip2/ E13-sip3/ -b E15-sip1/ E15-sip2/ E15-sip3/ -p test.peaks.txt -genome mm10 >E13.15.diff.txt
+getDifferentialPeaksReplicates.pl -b E13-sip1/ E13-sip2/ E13-sip3/ -t E15-sip1/ E15-sip2/ E15-sip3/ -p test.peaks.txt -genome mm10 >E15.13.diff.txt
+
+getDifferentialPeaksReplicates.pl -t E15-sip1/ E15-sip2/ E15-sip3/ -b E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E15.17.diff.txt
+getDifferentialPeaksReplicates.pl -b E15-sip1/ E15-sip2/ E15-sip3/ -t E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E17.15.diff.txt
+
+getDifferentialPeaksReplicates.pl -t E11-sip1/ E11-sip2/ E11-sip3/ -b E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E11.17.diff.txt
+getDifferentialPeaksReplicates.pl -b E11-sip1/ E11-sip2/ E11-sip3/ -t E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E17.11.diff.txt
+
