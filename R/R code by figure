@@ -1,0 +1,43 @@
+Figure 2b,c: Paper code file
+
+Figure 2d
+#pathway and BP enrichment for all genes in STAU2 cargo (Fig.2 and Fig. S2)
+library (hypeR)
+library(msigdbr)
+#download genesets
+biocarta <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:BIOCARTA")
+kegg <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:KEGG")
+reactome <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:REACTOME")
+paths<- c(biocarta$genesets, kegg$genesets, reactome$genesets)
+GOBP <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "BP")
+GOMF <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "MF")
+GOCC <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "CC")
+
+  all_paths<- hypeR(as.character (scores$Gene.Name), paths, background=55487, fdr=0.01) #scores: Table S2
+  all_paths<- all_paths$data[,1:8]
+  all_bp<- hypeR(as.character (scores$Gene.Name), GOBP, background=55487, fdr=0.01)
+  all_bp<- all_bp$data[,1:8]
+  #df:all_paths or all_bp
+  hyp_plot2<-function(df,top=15,main="Top Categories",fills=c("black","gray")){
+    df.1 <- head(df, top)
+    df.2 <- df.1
+    df.2$log.fdr <- -log10(df.1$fdr)
+    df.2$Contribution <- df.1$overlap/df.1$geneset * df.2$log.fdr #calculates the contribution of df genes to the category
+    df.2$x1 <- df.2$log.fdr - df.2$Contribution #adds a column x1 
+    df.3<-df.2[,c("label","Contribution")] #new df with only category and contribution columns
+    df.3$Membership<-rep("Cargo",top) #top<- 10 #assigns the top categories for genes in cargo
+    df.4<-df.2[,c("label","x1")] #new df x1 that represents remaining genes in category
+    colnames(df.4)<-c("label","Contribution")
+    df.4$Membership<-rep("Not Cargo",top) #assigns top categories for remaining genes in category
+    df.2<-rbind(df.4,df.3) #new matrix consisting of genes in cargo and remaining genes in category
+    df.2$label<-strwrap(df.2$label,width=30) 
+    #bar graph to plot top 15 categories
+    df.2$label<- factor(df.2$label, levels=df.2[1:15,]$label)
+    p1<- ggplot(df.2,aes(y = Contribution, x = label)) + theme_bw() + theme(axis.text=element_text(size=10))
+    p1<- p1 + geom_col(aes(fill=Membership))+coord_flip()
+    p1<- p1 + theme(legend.position="bottom", legend.direction="horizontal") +scale_fill_discrete(name="Percent of Category")
+    p1<- p1 + scale_fill_manual(values=fills)
+    p1<- p1+ labs(x=element_blank(), y="log(FDR)") + theme(legend.text=element_text(size=10))
+    p1<- p1 + labs(title=main) + theme(plot.title=element_text(hjust=0)) +xlab("log(FDR)")
+    p1
+  }
