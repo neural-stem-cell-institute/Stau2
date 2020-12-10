@@ -1,3 +1,132 @@
+##Figure 2
+library(dplyr)
+library(tibble)
+library(foreach)
+library (ggpmisc)
+library(ggplot2)
+library(hypeR)
+#####Analyze peak data
+
+#####2B: describe distribution of peaks by feature 
+
+anno<-as.character(df$Gene.Type) #df-Table S1
+anno<-replace(anno,grep("rRNA",anno),"rRNA")
+anno<-replace(anno,grep("lincRNA",anno),"lincRNA")
+anno<-replace(anno,grep("protein_coding",anno),"protein_coding")
+anno<-replace(anno,grep("miRNA",anno),"miRNA")
+anno<-replace(anno,grep("misc_RNA",anno),"misc_RNA")
+anno<-replace(anno,grep("snRNA",anno),"snRNA")
+anno<-replace(anno,grep("snoRNA",anno),"snoRNA")
+anno<-replace(anno,grep("scaRNA",anno),"scaRNA")
+anno<-replace(anno,grep("lncRNA",anno),"lncRNA")
+anno<-replace(anno,grep("pseudogene",anno),"pseudogene")
+anno<-replace(anno,grep("antisense",anno),"other")
+anno<-replace(anno,grep("TEC",anno),"other")
+anno<-replace(anno,grep("sense",anno),"other")
+anno<-replace(anno,grep("processed",anno),"other")
+
+#for convenience plotted the top 8 categories
+fills=c("black","yellow","darkred","cadetblue1","purple3","green4","orange", "pink")
+df$anno<-anno
+anno<-as.data.frame(table(anno))
+colnames(anno)<-c("Feature","Number")
+anno.tb<-tibble(anno)
+anno.tb<-tibble(x=1.1,y=-0.4,tb=list(anno))
+anno.pie<-ggplot(anno,aes(x=2,y=Number,fill=Feature)) + geom_col(width=0.9)
+anno.pie<- anno.pie+coord_polar("y",start=90,clip="off")+scale_fill_manual(values=fills) + theme_void() + xlim(0.5, 2.5)
+anno.pie<-anno.pie + geom_table(data=anno.tb,aes(x,y,label=tb), vjust=0.35,hjust=.90,colour="dark blue", size=3)
+anno.pie
+
+#####2C: describe distribution of peaks by feature ####df- Table S1
+  distribute.plot<-function(df) {
+    anno<-as.character(peaks$Annotation)
+    anno<-replace(anno,grep("TTS",anno),"TTS")
+    anno<-replace(anno,grep("3' UTR",anno),"3'UTR")
+    anno<-replace(anno,grep("5' UTR",anno),"5'UTR")
+    anno<-replace(anno,grep("intron",anno),"intron")
+    anno<-replace(anno,grep("exon",anno),"exon")
+    anno<-replace(anno,grep("promoter",anno),"promoter")
+    anno<-replace(anno,grep("Intergenic",anno),"Intergenic")
+    peaks$anno<-anno
+    anno<-as.data.frame(table(anno))
+    colnames(anno)<-c("Feature","Number")
+    anno.tb<-tibble(anno)
+    anno.tb<-tibble(x=1,y=-0.5,tb=list(anno))
+    anno.pie<-ggplot(anno,aes(x=2,y=Number,fill=Feature)) + geom_col(width=1)
+    anno.pie<- anno.pie+coord_polar("y",start=90,clip="off")+scale_fill_manual(values=c("black","yellow","darkred","cadetblue1",
+                                                                                        "purple3","green4","orange")) + theme_void() + xlim(0.5, 2.5) + 
+      geom_table(data=anno.tb,aes(x,y,label=tb),
+                                      vjust=0.35,hjust=.90,colour="dark blue", size=3)}
+  
+  #####2D: peaks per gene
+
+  x<-unique(as.character(dft$Entrez.ID)) #dft- Table S1
+  pks_per_gene<-foreach(i=1:length(x),.combine='c') %dopar% {
+    length(which(as.character(dft$Entrez.ID)==x[i]))
+  }
+  names(pks_per_gene)<-x
+  x<-foreach(i=1:22,.combine='c') %dopar% { length(which(pks_per_gene==i))}
+  x<-data.frame(1:22,x)
+  colnames(x)<-c("Peaks_gene","Number_genes")
+  
+  p1<-ggplot(x,(aes(x=Peaks_gene,y=Number_genes))) + geom_bar(sta='identity')
+  p1<-p1 + labs(y="Number of Genes",x="Peaks per Gene") + ggtitle("Distribution of Peaks per Gene")
+  p1<-p1 + theme(text = element_text(size=12))
+  
+  
+  
+  
+###2E
+#' Plotting enrichment bar charts using ggplot2 to make a plot similar to hyp_plot from the hypeR package to allow greater flexibility in display
+library (hypeR)
+library(msigdbr)
+#download genesets
+biocarta <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:BIOCARTA")
+kegg <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:KEGG")
+reactome <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:REACTOME")
+paths<- c(biocarta$genesets, kegg$genesets, reactome$genesets)
+GOBP <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "BP")
+GOMF <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "MF")
+GOCC <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "CC")
+
+
+#pathway and BP enrichment for all genes in STAU2 cargo (Fig.2 and Fig. S2)
+  all_paths<- hypeR(as.character (scores$Gene.Name), paths, background=55487, fdr=0.01) #scores- Table S2 
+  all_paths<- all_paths$data[,1:8]
+  all_bp<- hypeR(as.character (scores$Gene.Name), GOBP, background=55487, fdr=0.01)
+  all_bp<- all_bp$data[,1:8]
+  
+  #df:all_paths or all_bp
+  hyp_plot2<-function(df,top=15,main="Top Categories",fills=c("black","gray")){
+    df.1 <- head(df, top)
+    df.2 <- df.1
+    df.2$log.fdr <- -log10(df.1$fdr)
+    df.2$Contribution <- df.1$overlap/df.1$geneset * df.2$log.fdr #calculates the contribution of df genes to the category
+    df.2$x1 <- df.2$log.fdr - df.2$Contribution #adds a column x1 
+    df.3<-df.2[,c("label","Contribution")] #new df with only category and contribution columns
+    df.3$Membership<-rep("Cargo",top) #top<- 10 #assigns the top categories for genes in cargo
+    df.4<-df.2[,c("label","x1")] #new df x1 that represents remaining genes in category
+    colnames(df.4)<-c("label","Contribution")
+    df.4$Membership<-rep("Not Cargo",top) #assigns top categories for remaining genes in category
+    df.2<-rbind(df.4,df.3) #new matrix consisting of genes in cargo and remaining genes in category
+    df.2$label<-strwrap(df.2$label,width=30) 
+    #bar graph to plot top 15 categories
+    df.2$label<- factor(df.2$label, levels=df.2[1:15,]$label)
+    p1<- ggplot(df.2,aes(y = Contribution, x = label)) + theme_bw() + theme(axis.text=element_text(size=10))
+    p1<- p1 + geom_col(aes(fill=Membership))+coord_flip()
+    p1<- p1 + theme(legend.position="bottom", legend.direction="horizontal") +scale_fill_discrete(name="Percent of Category")
+    p1<- p1 + scale_fill_manual(values=fills)
+    p1<- p1+ labs(x=element_blank(), y="log(FDR)") + theme(legend.text=element_text(size=10))
+    p1<- p1 + labs(title=main) + theme(plot.title=element_text(hjust=0)) +xlab("log(FDR)")
+    p1
+  }
+  
+
+
+
+
+
+
 R version 4.0.2 (2020-06-22)
 Platform: x86_64-w64-mingw32/x64 (64-bit)
 Running under: Windows >= 8 x64 (build 9200)
