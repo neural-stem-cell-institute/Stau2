@@ -1,0 +1,127 @@
+#Figure 3
+library(ggplot2)
+library(foreach)
+library(hypeR)
+
+###3A,B
+
+#####function to identify dynamic vs stable cargo####
+####uses a weighted-t-test to calculate the t-statistic 
+####then the bayes factor is calulated from the t-statistic
+scorer<-function(df,group,comps,cols,ncores=1){
+  require(BayesFactor)
+  require(foreach)
+  require(doParallel)
+  require(weights)
+  registerDoParallel(makeCluster(ncores))
+  ids<-unique(as.character(df$Entrez.ID))
+  if(length(which(is.na(ids)))>=1) {ids<-ids[-(which(is.na(ids)))] }
+  adj.bfs<-foreach(b=1:length(comps), .combine='cbind') %do% {
+    tstats<-foreach(i=1:length(ids),.combine="c") %dopar% {
+      mat2<-df[which(as.character(df$Entrez.ID)==ids[i]),]
+      if(dim(mat2)[1]>1){
+        wgt<-ecdf(0:max(mat2$Peak.Score))
+        wgt<-sapply(mat2$Peak.Score,wgt)+1
+      } else {wgt<-2}
+      mat1<-mat2[,cols]
+      mat1<-mat1[,c(grep(as.character(comps[[b]][1]),colnames(mat1)),
+                    grep(as.character(comps[[b]][2]),colnames(mat1)))]
+      sub.group<-factor(group[c(grep(as.character(comps[[b]][1]),colnames(mat1)),
+                                grep(as.character(comps[[b]][2]),colnames(mat1)))])
+      mat3<-mat1[,sub.group==levels(sub.group)[1]]
+      mat4<-mat1[,sub.group==levels(sub.group)[2]]
+      mat3<-cbind(unlist(mat3),unlist(mat4),rep(wgt,length(wgt)))
+      tstat<-weights:::wtd.t.test(mat3[,1],mat3[,2],mat3[,3])$coefficients[1]
+    }
+    tstats<-replace(tstats,which(is.nan(tstats)),0)
+    if(length(which(is.infinite(tstats)))>=1) {
+      tstats<-replace(tstats,which(is.infinite(tstats)),max(tstats[-(which(is.infinite(tstats)))]))
+    }
+    n1<-length(grep(as.character(comps[[b]][1]),colnames(df[,cols])))
+    n2<-length(grep(as.character(comps[[b]][2]),colnames(df[,cols])))
+    
+    bfs<-sapply(tstats,function(x) BayesFactor:::ttest.tstat(x,n1,n2)$bf)
+  }
+  rownames(adj.bfs)<-ids
+  TC.BF<-apply(adj.bfs,1,sum)
+  fin.scores<-data.frame(adj.bfs,TC.BF)
+  return(fin.scores)
+}
+score.clean<-scorer(dft,group,comps,cols,ncores=10)
+####took about 10 minutes
+colnames(score.clean)<-c("E11_vs_E13.ln(BF)","E13_vs_E15.ln(BF)","E15_vs_E17.ln(BF)","E11_vs_E17.ln(BF)","summed.ln(BF)") ####Table S2
+
+
+#####Fig. 3a: histogram for scores
+hist(scores$summed.ln(BF),breaks=101)
+hist(scores$summed.ln(BF),breaks=1001)
+p<-ggplot(aes(x=summed.ln(BF)), data=scores)
+p<- p+geom_histogram(binwidth=0.5, color="black", fill="gray")
+p<-p + scale_x_continuous(breaks=seq(-5,30,1))
+
+#3C-F: biological process and pathway enrichment of cargo genes
+
+#download genesets
+biocarta <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:BIOCARTA")
+kegg <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:KEGG")
+reactome <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:REACTOME")
+paths<- c(biocarta$genesets, kegg$genesets, reactome$genesets)
+GOBP <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "BP")
+
+
+#pathway and BP enrichment for dynamic genes in STAU2 cargo
+dynamic<-scores[which(exp(scores$summed.ln(BF))>=100),] #scores- Table S2 
+dyn_paths<- hypeR(as.character (dynamic$Gene.Name), paths, background=55487, fdr=0.01)
+dyn_paths<- dyn_paths$data[,1:8]
+dyn_paths<- hypeR(as.character (dynamic$Gene.Name), GOBP, background=55487, fdr=0.01)
+dyn_bp<- dynamic_bp$data[,1:8]
+
+#pathway and BP enrichment for partially dynamic genes in STAU2 cargo
+partially.dynamic<- scores[which(exp(scores$summed.ln(BF))<100 & exp(scores$summed.ln(BF))>=3),]
+par.dyn_paths<- hypeR(as.character (partially.dynamic$Gene.Name), paths, background=55487, fdr=0.01)
+par.dyn_paths<- partially.dynamic_paths$data[,1:8]
+par.dyn_bp<- hypeR(as.character (partially.dynamic$Gene.Name), GOBP, background=55487, fdr=0.01)
+par.dyn_bp<- partially.dynamic_bp$data[,1:8]
+
+#pathway and BP enrichment for strongly stable genes in STAU2 cargo
+stable_strong<-scores[which(exp(scores$summed.ln(BF))<0.33),]
+stable_strong_paths<- hypeR(as.character (stable_strong$Gene.Name), paths, background=55487, fdr=0.01)
+stable_strong_paths<- stable_strong_paths$data[,1:8]
+stable_strong_bp<- hypeR(as.character (stable_strong$Gene.Name), GOBP, background=55487, fdr=0.01)
+stable_strong_bp<- stable_strong_bp$data[,1:8]
+
+#unique pathways for dynamic genes in STAU2 cargo
+dyn_not_stable_strong<- anti_join(dyn_paths, stable_strong_paths, by="label")
+#unique pathways for strongly stable genes in STAU2 cargo
+stable_strong_not_dynamic<- anti_join(stable_strong_paths, dyn_paths, by="label")
+#unique bp for dynamic genes in STAU2 cargo
+dyn_not_stable_strong_bp<- anti_join(dyn_bp, stable_strong_bp, by="label")
+#unique bp for strongly stable in STAU2 cargo
+stable_strong_not_dyn_bp<- anti_join(stable_strong_bp, dyn_bp, by="label")
+
+#plotting
+#using dfs generated above eg. dyn_paths, stable_strong_paths, etc
+hyp_plot2<-function(df,top=15,main="Top Categories",fills=c("black","gray")){
+  df.1 <- head(df, top)
+  df.2 <- df.1
+  df.2$log.fdr <- -log10(df.1$fdr)
+  df.2$Contribution <- df.1$overlap/df.1$geneset * df.2$log.fdr #calculates the contribution of df genes to the category
+  df.2$x1 <- df.2$log.fdr - df.2$Contribution #adds a column x1 
+  df.3<-df.2[,c("label","Contribution")] #new df with only category and contribution columns
+  df.3$Membership<-rep("Cargo",top) #top<- 10 #assigns the top categories for genes in cargo
+  df.4<-df.2[,c("label","x1")] #new df x1 that represents remaining genes in category
+  colnames(df.4)<-c("label","Contribution")
+  df.4$Membership<-rep("Not Cargo",top) #assigns top categories for remaining genes in category
+  df.2<-rbind(df.4,df.3) #new matrix consisting of genes in cargo and remaining genes in category
+  df.2$label<-strwrap(df.2$label,width=30) 
+  
+  #bar graph to plot top 15 categories
+  df.2$label<- factor(df.2$label, levels=df.2[1:15,]$label)
+  p1<- ggplot(df.2,aes(y = Contribution, x = label)) + theme_bw() + theme(axis.text=element_text(size=10))
+  p1<- p1 + geom_col(aes(fill=Membership))+coord_flip()
+  p1<- p1 + theme(legend.position="bottom", legend.direction="horizontal") +scale_fill_discrete(name="Percent of Category")
+  p1<- p1 + scale_fill_manual(values=fills)
+  p1<- p1+ labs(x=element_blank(), y="log(FDR)") + theme(legend.text=element_text(size=10))
+  p1<- p1 + labs(title=main) + theme(plot.title=element_text(hjust=0)) +xlab("log(FDR)")
+  p1
+}
