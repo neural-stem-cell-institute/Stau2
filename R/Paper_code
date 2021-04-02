@@ -153,16 +153,21 @@ resample<-function(mat){
   z1<-apply(mat,2,sum)
   z1<-mat/z1
   fin<-foreach(i=1:dim(z1)[2],.combine='cbind') %do% {
-    z2<-sample(rownames(z1),10000000,replace=T,prob=z1[,i])
-    z2<-table(z2)
-    y1<-setdiff(rownames(z1),names(z2))
-    y2<-rep(0,length(y1))
-    names(y2)<-y1
-    z2<-c(z2,y2)
-    z2<-z2[sort(names(z2))]
+    samp<-foreach(b=1:100,.combine='cbind') %do% {
+      z2<-sample(rownames(z1),10000000,replace=T,prob=z1[,i])
+      z2<-table(z2)
+      y1<-setdiff(rownames(z1),names(z2))
+      y2<-rep(0,length(y1))
+      names(y2)<-y1
+      z2<-c(z2,y2)
+      z2<-z2[sort(rownames(z1))]
+    }
+    trunc(apply(samp,1,mean))
   }
+  rownames(fin)<-sort(rownames(z1))
   return(fin)
 }
+
 ####function to generate an annotation file from genecode data broken into introns, intergenic, exon, and UTR regions
 make_anno<-function(filename) {
   require(GenomicFeatures)
@@ -244,6 +249,56 @@ hanno<-function(gr1,gr2,granno,cts.col=NULL,numb=5,group.num=3){
       return(fin)
     }
 }
+#########ggplot color replicator
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+###make treemap from hypeR enrichment file
+treemap_hyperGO<-function(enr_df,goterms,res.h=0.8,orgdb="org.Mm.eg.db") {
+  require(treemapify)
+  require(rrvgo)
+  require(LSAfun)
+  sizes<-(-(log(enr_df$data$fdr)))
+  y<-unlist(substring(enr_df$data$label,4))
+  y<-breakdown(y)
+  y<-goterms[y]
+  z<-which(is.na(y))
+  y<-y[-z]
+  names(sizes)<-y
+  sizes<-sizes[-(which(is.na(names(sizes))))]
+  sm<-calculateSimMatrix(y,orgdb=orgdb,ont="BP",method="Rel")
+  x<-intersect(y,rownames(sm))
+  sizes<-sizes[x]
+  o <- rev(order(sizes, na.last = FALSE))
+  sm <- sm[o, o]
+  cluster <- cutree(hclust(as.dist(1 - sm)), h = res.h)
+  clusterRep <- tapply(rownames(sm), cluster, function(x) x[which.max(sizes[x])])
+  red<-data.frame(go = rownames(sm), 
+                  cluster = cluster, 
+                  parent = clusterRep[cluster],
+                  parentSimScore = unlist(Map(seq_len(nrow(sm)), 
+                                              clusterRep[cluster], f = function(i, j) sm[i,j])), 
+                  size = sizes[match(rownames(sm), names(sizes))],
+                  term = rrvgo:::getGoTerm(rownames(sm)), 
+                  parentTerm = rrvgo:::getGoTerm(clusterRep[cluster]))
+  
+  ncolors<-gg_color_hue(length(unique(red$parentTerm)))
+  mcolors<-red$parentTerm
+  for(i in 1:length(ncolors)){
+    mcolors[which(mcolors==unique(red$parentTerm)[i])]<-ncolors[i]
+  }
+  red$mcolors<-mcolors
+  
+  p<-ggplot(red, aes(area=sizes,subgroup=parentTerm,fill=mcolors))
+  p<-p + geom_treemap()
+  p<-p + geom_treemap_subgroup_border()
+  p<-p + geom_treemap_subgroup_text(place='center',grow=F,alpha=1,min.size=6,reflow=T)
+  p<-p + theme(legend.position = "none")
+  p
+}
+
 #######load data and make objects for analysis
 library(hypeR)
 library(dplyr)
@@ -259,6 +314,9 @@ library(GenomicRanges)
 library(RColorBrewer)
 library(GenomicAlignments)
 library(foreach)
+library(akmedoids)
+library(GO.db)
+
 
 granno<-make_anno("gencode.vM21.annotation.gtf")
 
@@ -274,6 +332,10 @@ names(ensID2ent)<-z[,3]
 unique(ensID2SYM)[1:5]
 ensID2SYM<-ensID2SYM[-(which(duplicated(names(ensID2SYM))))]
 ensID2ent<-ensID2ent[-(which(duplicated(names(ensID2ent))))]
+
+x <- Term(GOTERM)
+goterms<-names(x)
+names(goterms)<-x
 
 ###read in peaks file from homer to make a granges peak object for pos and neg strands
 peaks<-data.frame(read.delim("Peak.counts.txt"))
@@ -340,11 +402,18 @@ dev.off()
 
 
 ###set up dataframe for Bayes factor analysis to look for genes 
-###differentally binding across time course
+###differrntally binding across time course
 ###used a peak score of 15 as cut off based on endothelial data set
-####took about 10 minutes
 dft<-test[-(which(test$genome_location=="Intergenic")),]
-dft<-dft[dft$Peak.Score>15,]
+
+###trim ends of peak scores and find elbow point or knee to use as cutoff
+trimmed<-peaks$Peak.Score
+trimmed<-sort(trimmed,decreasing=F)
+trimmed<-trimmed[trunc(length(trimmed)*0.2):trunc(length(trimmed)*.8)]
+ep<-elbowPoint(1:length(trimmed),trimmed)
+
+dft<-dft[dft$Peak.Score>ep$y,]
+
 
 score.clean<-scorer(dft,group,comps,cols,ncores=3)
 x<-data.frame(score.clean,ensID2SYM[rownames(score.clean)])
@@ -412,18 +481,8 @@ colnames(TF.table)<-c("Gene","Stability")
 write.csv(TF.table,"TF.table.csv")
 
 
-tablemaker<-function(df,filexp){
-  df<-df[,-17]
-  df<-df[,-15]
-  df<-df[,-14]
-  df<-df[,-13]
-  df<-df[,-11]
-  df<-df[,-9]
-  df<-df[,-7]
-  write.csv(df,paste(filexp,".csv",sep=""))
-}
+write.csv(test,"MasterPeaks.cts.csv")
 
-write.csv(t1.mf,"Transient.GOMF.csv")  
 
 sessionInfo()
 #R version 3.6.0 (2019-04-26)
