@@ -368,7 +368,7 @@ names(TID2ensID)<-xa[,2]
 ##### and make an annotated peak data frame
 
 x<-dir()
-x<-x[grep("SIP",x)]9
+x<-x[grep("SIP",x)]
 
 pos.cts<-Read.bam.in(x,hpos.gr)
 rownames(pos.cts)<-hpos.gr@elementMetadata$peaks
