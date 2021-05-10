@@ -403,7 +403,8 @@ dev.off()
 
 ###set up dataframe for Bayes factor analysis to look for genes 
 ###differrntally binding across time course
-###used a peak score of 15 as cut off based on endothelial data set
+###trimmed peak score and calculated elbow point
+###used a peak score greater than the elbow point as cut off based on endothelial data set
 dft<-test[-(which(test$genome_location=="Intergenic")),]
 
 ###trim ends of peak scores and find elbow point or knee to use as cutoff
