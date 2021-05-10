@@ -52,18 +52,3 @@ mergePeaks -d give test.txt E17.peaks.txt -prefix test
 cat test_test.txt test_test.txt_E17.peaks.txt test_E17.peaks.txt > test.peaks.txt
 
 
-getDifferentialPeaksReplicates.pl -t E11-sip1/ E11-sip2/ E11-sip3/ -b E13-sip1/ E13-sip2/ E13-sip3/ -p test.peaks.txt -genome mm10 >E11.13.diff.txt
-getDifferentialPeaksReplicates.pl -b E11-sip1/ E11-sip2/ E11-sip3/ -t E13-sip1/ E13-sip2/ E13-sip3/ -p test.peaks.txt -genome mm10 >E13.11.diff.txt
-
-getDifferentialPeaksReplicates.pl -t E13-sip1/ E13-sip2/ E13-sip3/ -b E15-sip1/ E15-sip2/ E15-sip3/ -p test.peaks.txt -genome mm10 >E13.15.diff.txt
-getDifferentialPeaksReplicates.pl -b E13-sip1/ E13-sip2/ E13-sip3/ -t E15-sip1/ E15-sip2/ E15-sip3/ -p test.peaks.txt -genome mm10 >E15.13.diff.txt
-
-getDifferentialPeaksReplicates.pl -t E15-sip1/ E15-sip2/ E15-sip3/ -b E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E15.17.diff.txt
-getDifferentialPeaksReplicates.pl -b E15-sip1/ E15-sip2/ E15-sip3/ -t E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E17.15.diff.txt
-
-getDifferentialPeaksReplicates.pl -t E11-sip1/ E11-sip2/ E11-sip3/ -b E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E11.17.diff.txt
-getDifferentialPeaksReplicates.pl -b E11-sip1/ E11-sip2/ E11-sip3/ -t E17-sip1/ E17-sip2/ E17-sip3/ -p test.peaks.txt -genome mm10 >E17.11.diff.txt
-
-annotatePeaks.pl test.peaks.txt mm10 -gtf gencode.vM21.annotation.gtf -size given -d E11-sip1/ E11-sip2/ E11-sip3/ E13-sip1/ E13-sip2/ E13-sip3/ E15-sip1/ E15-sip2/ E15-sip3/ E17-sip1/ E17-sip2/ E17-sip3/
-
-
