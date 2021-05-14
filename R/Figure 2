@@ -1,135 +1,145 @@
 ##Figure 2
+
+##Fig. 2A: See https://github.com/neural-stem-cell-institute/Stau2/blob/master/R/Paper_code for RIP seq pipeline code and all functions
+
+
 library(dplyr)
 library(tibble)
 library(foreach)
-library (ggpmisc)
-library(ggplot2)
 library(hypeR)
-#####Analyze peak data
+library(org.Mm.eg.db)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(ggpmisc)
+library(stringr)
+library(biomaRt)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(rtracklayer)
+library(Rsamtools)
+library(RColorBrewer)
+library(GenomicAlignments)
+library(foreach)
+library(akmedoids)
+library(GO.db)
+
+
 
 #####2B: describe distribution of peaks by feature 
 
-anno<-as.character(df$Gene.Type) #df-Table S1
-anno<-replace(anno,grep("rRNA",anno),"rRNA")
-anno<-replace(anno,grep("lincRNA",anno),"lincRNA")
-anno<-replace(anno,grep("protein_coding",anno),"protein_coding")
-anno<-replace(anno,grep("miRNA",anno),"miRNA")
-anno<-replace(anno,grep("misc_RNA",anno),"misc_RNA")
-anno<-replace(anno,grep("snRNA",anno),"snRNA")
-anno<-replace(anno,grep("snoRNA",anno),"snoRNA")
-anno<-replace(anno,grep("scaRNA",anno),"scaRNA")
-anno<-replace(anno,grep("lncRNA",anno),"lncRNA")
-anno<-replace(anno,grep("pseudogene",anno),"pseudogene")
-anno<-replace(anno,grep("antisense",anno),"other")
-anno<-replace(anno,grep("TEC",anno),"other")
-anno<-replace(anno,grep("sense",anno),"other")
-anno<-replace(anno,grep("processed",anno),"other")
 
-#for convenience plotted the top 8 categories
-fills=c("black","yellow","darkred","cadetblue1","purple3","green4","orange", "pink")
-df$anno<-anno
-anno<-as.data.frame(table(anno))
-colnames(anno)<-c("Feature","Number")
-anno.tb<-tibble(anno)
-anno.tb<-tibble(x=1.1,y=-0.4,tb=list(anno))
-anno.pie<-ggplot(anno,aes(x=2,y=Number,fill=Feature)) + geom_col(width=0.9)
-anno.pie<- anno.pie+coord_polar("y",start=90,clip="off")+scale_fill_manual(values=fills) + theme_void() + xlim(0.5, 2.5)
-anno.pie<-anno.pie + geom_table(data=anno.tb,aes(x,y,label=tb), vjust=0.35,hjust=.90,colour="dark blue", size=3)
-anno.pie
-
-#####2C: describe distribution of peaks by feature ####df- Table S1
-  distribute.plot<-function(df) {
-    anno<-as.character(peaks$Annotation)
-    anno<-replace(anno,grep("TTS",anno),"TTS")
-    anno<-replace(anno,grep("3' UTR",anno),"3'UTR")
-    anno<-replace(anno,grep("5' UTR",anno),"5'UTR")
-    anno<-replace(anno,grep("intron",anno),"intron")
-    anno<-replace(anno,grep("exon",anno),"exon")
-    anno<-replace(anno,grep("promoter",anno),"promoter")
-    anno<-replace(anno,grep("Intergenic",anno),"Intergenic")
-    peaks$anno<-anno
-    anno<-as.data.frame(table(anno))
-    colnames(anno)<-c("Feature","Number")
-    anno.tb<-tibble(anno)
-    anno.tb<-tibble(x=1,y=-0.5,tb=list(anno))
-    anno.pie<-ggplot(anno,aes(x=2,y=Number,fill=Feature)) + geom_col(width=1)
-    anno.pie<- anno.pie+coord_polar("y",start=90,clip="off")+scale_fill_manual(values=c("black","yellow","darkred","cadetblue1",
-                                                                                        "purple3","green4","orange")) + theme_void() + xlim(0.5, 2.5) + 
-      geom_table(data=anno.tb,aes(x,y,label=tb),
-                                      vjust=0.35,hjust=.90,colour="dark blue", size=3)}
+#' Plot distribution of peaks by feature pie chart and table
+#'
+#' @param df A data.frame read in from the HOMER function annotatePeaks.pl
+#' @param fills Colors for pie chart, must be a vector of length 7. Current colors are colorblind safe.
+#' @param export If you want to export the graphs fill in a file name here, eg "Distribution_graphs.pdf", when exporting two graphs are generated one is the pie chart/table and the other is a distribution of peaks per gene
+distribution_with_plots<-function(dfa,fills=c("yellow","darkred","cadetblue1","purple3","green4")) {
+  require(dplyr)
+  require(tibble)
+  require(foreach)
+  anno<-as.data.frame(table(dfa$genome_location))
+  colnames(anno)<-c("Feature","Number")
+  anno.tb<-tibble(anno)
+  anno.tb<-tibble(x=1,y=-0.5,tb=list(anno))
+  anno.pie<-ggplot(anno,aes(x=2,y=Number,fill=Feature)) + geom_col(width=1)
+  anno.pie<- anno.pie+coord_polar("y",start=90,clip="off")+scale_fill_manual(values=fills) + theme_void() + xlim(0.5, 2.5)
+  anno.pie<-anno.pie + geom_table(data=anno.tb,aes(x,y,label=tb), vjust=0.35,hjust=.90,colour="dark blue", size=3)
   
-  #####2D: peaks per gene
-
-  x<-unique(as.character(dft$Entrez.ID)) #dft- Table S1
-  pks_per_gene<-foreach(i=1:length(x),.combine='c') %dopar% {
-    length(which(as.character(dft$Entrez.ID)==x[i]))
+  x<-unique(as.character(dfa$ensembl_ID))
+  pks_per_gene<-foreach(i=1:length(x),.combine='c') %do% {
+    length(which(as.character(dfa$ensembl_ID)==x[i]))
   }
   names(pks_per_gene)<-x
-  x<-foreach(i=1:22,.combine='c') %dopar% { length(which(pks_per_gene==i))}
-  x<-data.frame(1:22,x)
+  x<-foreach(i=1:max(pks_per_gene),.combine='c') %dopar% { length(which(pks_per_gene==i))}
+  x<-data.frame(1:max(pks_per_gene),x)
   colnames(x)<-c("Peaks_gene","Number_genes")
+  pks1<-ggplot(x,(aes(x=Peaks_gene,y=Number_genes))) + geom_bar(sta='identity')
+  pks1<-pks1 + labs(y="Number of Genes",x="Peaks per Gene") + ggtitle("Distribution of Peaks per Gene")
+  pks1<-pks1 + theme(text = element_text(size=12))
   
-  p1<-ggplot(x,(aes(x=Peaks_gene,y=Number_genes))) + geom_bar(sta='identity')
-  p1<-p1 + labs(y="Number of Genes",x="Peaks per Gene") + ggtitle("Distribution of Peaks per Gene")
-  p1<-p1 + theme(text = element_text(size=12))
-  
-  
-  
-  
-###2E
+  fin<-list(dfa,anno.pie,pks1)
+  names(fin)<-c("Adj.anno.df","Pie_chart","Peakpergene_plot")
+  return(fin)
+}
+
+dfa<-distribution_with_plots(masterpeaks) #use table S1
+pdf(file="New_Stau2_peak_plots.pdf",onefile=T,paper="letter",width=7.5,height=10)
+dfa[[2]]
+dfa[[3]]
+dev.off()
+
+REACTOME <- msigdb_gsets(species="Mus musculus", category="C2", subcategory="CP:REACTOME")
+GOBP <- msigdb_gsets(species="Mus musculus", category="C5", subcategory="BP")
+
+all.bp<- hypeR(scores$Gene.Name, GOBP, background=55487, fdr=0.01)
+all.path<-hypeR(scores$Gene.Name, REACTOME, background=55487, fdr=0.01)
+
+
+write.csv(all.path$data,"All_pathways.csv")
+write.csv(all.bp$data,"All_GOBP.csv")
+
+
+
+#' Beautify the names of the GO categories for plotting
+#' @param df A data.frame generated by hypeR function from the 'hypeR' package
+namer<-function(df){
+  x<-unlist(lapply(strsplit(df$label,"GO_"),paster))
+  x<-unlist(lapply(strsplit(x,"_"), paster))
+  df$category<-x
+  return(df)
+}
+
+#' internal function used by function 'namer'
+#' @param x 
+paster<-function(x) {
+  paste(x,collapse=" ")
+}
+
 #' Plotting enrichment bar charts using ggplot2 to make a plot similar to hyp_plot from the hypeR package to allow greater flexibility in display
-library (hypeR)
-library(msigdbr)
-#download genesets
-biocarta <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:BIOCARTA")
-kegg <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:KEGG")
-reactome <- msigdb_gsets(species="Mus musculus", category="C2", subcategory = "CP:REACTOME")
-paths<- c(biocarta$genesets, kegg$genesets, reactome$genesets)
-GOBP <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "BP")
-GOMF <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "MF")
-GOCC <- msigdb_gsets(species="Mus musculus", category="C5", subcategory = "CC")
-
-
-#pathway and BP enrichment for all genes in STAU2 cargo (Fig.2 and Fig. S2)
-  all_paths<- hypeR(as.character (scores$Gene.Name), paths, background=55487, fdr=0.01) #scores- Table S2 
-  all_paths<- all_paths$data[,1:8]
-  all_bp<- hypeR(as.character (scores$Gene.Name), GOBP, background=55487, fdr=0.01)
-  all_bp<- all_bp$data[,1:8]
+#' @param df A data.frame generated by 'hypeR' or 'namer'
+#' @param top The number of top categories to include, default=10
+#' @param main Title of graph
+#' @param fills List of colors of used for "Contribution" and "category" size
+hyp_plot2<-function(dfa,top=15,main="Top Categories",fills=c("black","gray")){
+  dfa<-dfa$data
+  dfa<-namer(dfa)
+  dfa <- head(dfa, top)
+  df.1 <- dfa[, c(9, 3:6)]
+  df.2 <- df.1
+  df.2$log.fdr <- -log10(df.1$fdr)
+  df.2$Contribution <- df.1$overlap/df.1$geneset * df.2$log.fdr
+  df.2$x1 <- df.2$log.fdr - df.2$Contribution
+  df.3<-df.2[,c(1,7)]
+  df.3$Membership<-rep("Cargo",top)
+  df.4<-df.2[,c(1,8)]
+  colnames(df.4)<-c("category","Contribution")
+  df.4$Membership<-rep("Not Cargo",top)
+  df.2<-rbind(df.4,df.3)
+  df.2$category<-str_wrap(df.2$category,width=30)
   
-  #df:all_paths or all_bp
-  hyp_plot2<-function(df,top=15,main="Top Categories",fills=c("black","gray")){
-    df.1 <- head(df, top)
-    df.2 <- df.1
-    df.2$log.fdr <- -log10(df.1$fdr)
-    df.2$Contribution <- df.1$overlap/df.1$geneset * df.2$log.fdr #calculates the contribution of df genes to the category
-    df.2$x1 <- df.2$log.fdr - df.2$Contribution #adds a column x1 
-    df.3<-df.2[,c("label","Contribution")] #new df with only category and contribution columns
-    df.3$Membership<-rep("Cargo",top) #top<- 10 #assigns the top categories for genes in cargo
-    df.4<-df.2[,c("label","x1")] #new df x1 that represents remaining genes in category
-    colnames(df.4)<-c("label","Contribution")
-    df.4$Membership<-rep("Not Cargo",top) #assigns top categories for remaining genes in category
-    df.2<-rbind(df.4,df.3) #new matrix consisting of genes in cargo and remaining genes in category
-    df.2$label<-strwrap(df.2$label,width=30) 
-    #bar graph to plot top 15 categories
-    df.2$label<- factor(df.2$label, levels=df.2[1:15,]$label)
-    p1<- ggplot(df.2,aes(y = Contribution, x = label)) + theme_bw() + theme(axis.text=element_text(size=10))
-    p1<- p1 + geom_col(aes(fill=Membership))+coord_flip()
-    p1<- p1 + theme(legend.position="bottom", legend.direction="horizontal") +scale_fill_discrete(name="Percent of Category")
-    p1<- p1 + scale_fill_manual(values=fills)
-    p1<- p1+ labs(x=element_blank(), y="log(FDR)") + theme(legend.text=element_text(size=10))
-    p1<- p1 + labs(title=main) + theme(plot.title=element_text(hjust=0)) +xlab("log(FDR)")
-    p1
-  }
-  
+  df.2$category<- factor(df.2$category, levels=df.2[1:15,]$category)
+  p1<- ggplot(df.2,aes(y = Contribution, x = category)) + theme_bw() + theme(axis.text=element_text(size=10))
+  p1<- p1 + geom_col(aes(fill=Membership))+coord_flip()
+  p1<- p1 + theme(legend.position="bottom", legend.direction="horizontal") +scale_fill_discrete(name="Percent of Category")
+  p1<- p1 + scale_fill_manual(values=fills)
+  p1<- p1+ labs(x=element_blank(), y="log(FDR)") + theme(legend.text=element_text(size=10))
+  p1<- p1 + labs(title=main) + theme(plot.title=element_text(hjust=0)) +xlab("log(FDR)")
+  p1
+}
+
+pdf(file="Stau2_all_plots.pdf",onefile=T,paper="letter",width=7.5,height=10)
+hyp_plot2(all.path,main="Top Signaling Pathways for All Genes")
+hyp_plot2(all.bp,main="Top GO:BP categories for All Genes")
+
+dev.off()
 
 
+###session info for all figures
 
-
-
-
-R version 4.0.2 (2020-06-22)
+R version 4.0.5 (2021-03-31)
 Platform: x86_64-w64-mingw32/x64 (64-bit)
-Running under: Windows >= 8 x64 (build 9200)
+Running under: Windows 7 x64 (build 7601) Service Pack 1
 
 Matrix products: default
 
@@ -139,21 +149,47 @@ locale:
 [5] LC_TIME=English_United States.1252    
 
 attached base packages:
-[1] stats     graphics  grDevices utils     datasets  methods   base     
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets  methods   base     
 
 other attached packages:
-[1] ggplot2_3.3.2 foreach_1.5.0 msigdbr_7.1.1 hypeR_1.4.0  
+ [1] dplyr_1.0.5                 GO.db_3.12.1                akmedoids_0.1.5            
+ [4] foreach_1.5.1               GenomicAlignments_1.26.0    SummarizedExperiment_1.20.0
+ [7] MatrixGenerics_1.2.1        matrixStats_0.58.0          RColorBrewer_1.1-2         
+[10] Rsamtools_2.6.0             Biostrings_2.58.0           XVector_0.30.0             
+[13] rtracklayer_1.49.5          GenomicFeatures_1.42.3      GenomicRanges_1.42.0       
+[16] GenomeInfoDb_1.26.6         biomaRt_2.46.3              org.Mm.eg.db_3.12.0        
+[19] AnnotationDbi_1.52.0        IRanges_2.24.1              S4Vectors_0.28.1           
+[22] Biobase_2.50.0              BiocGenerics_0.36.0         hypeR_1.6.0                
 
 loaded via a namespace (and not attached):
- [1] tidyselect_1.1.0  xfun_0.16         purrr_0.3.4       colorspace_1.4-1  vctrs_0.3.2      
- [6] generics_0.0.2    htmltools_0.5.0   viridisLite_0.3.0 rlang_0.4.7       pillar_1.4.6     
-[11] withr_2.2.0       glue_1.4.1        reactable_0.2.0   tweenr_1.0.1      lifecycle_0.2.0  
-[16] stringr_1.4.0     munsell_0.5.0     gtable_0.3.0      rvest_0.3.6       zip_2.1.0        
-[21] visNetwork_2.0.9  htmlwidgets_1.5.1 codetools_0.2-16  kableExtra_1.1.0  evaluate_0.14    
-[26] labeling_0.3      knitr_1.29        fansi_0.4.1       Rcpp_1.0.5        readr_1.3.1      
-[31] scales_1.1.1      webshot_0.5.2     jsonlite_1.7.0    farver_2.0.3      ggforce_0.3.2    
-[36] hms_0.5.3         digest_0.6.25     stringi_1.4.6     openxlsx_4.1.5    dplyr_1.0.1      
-[41] polyclip_1.10-0   grid_4.0.2        cli_2.0.2         tools_4.0.2       magrittr_1.5     
-[46] tibble_3.0.3      crayon_1.3.4      pkgconfig_2.0.3   ellipsis_0.3.1    MASS_7.3-51.6    
-[51] xml2_1.3.2        assertthat_0.2.1  rmarkdown_2.3     httr_1.4.2        rstudioapi_0.11  
-[56] iterators_1.0.12  R6_2.4.1          igraph_1.2.5      compiler_4.0.2  
+  [1] backports_1.2.1         Hmisc_4.5-0             BiocFileCache_1.14.0    systemfonts_1.0.1      
+  [5] plyr_1.8.6              igraph_1.2.6            splines_4.0.5           BiocParallel_1.24.1    
+  [9] crosstalk_1.1.1         ggplot2_3.3.3           digest_0.6.27           htmltools_0.5.1.1      
+ [13] ggpmisc_0.3.9           fansi_0.4.2             checkmate_2.0.0         magrittr_2.0.1         
+ [17] memoise_2.0.0           cluster_2.1.1           openxlsx_4.2.3          svglite_2.0.0          
+ [21] askpass_1.1             prettyunits_1.1.1       jpeg_0.1-8.1            colorspace_2.0-0       
+ [25] blob_1.2.1              rvest_1.0.0             rappdirs_0.3.3          xfun_0.22              
+ [29] tcltk_4.0.5             crayon_1.4.1            RCurl_1.98-1.3          jsonlite_1.7.2         
+ [33] survival_3.2-10         iterators_1.0.13        glue_1.4.2              kableExtra_1.3.4       
+ [37] polyclip_1.10-0         gtable_0.3.0            zlibbioc_1.36.0         webshot_0.5.2          
+ [41] DelayedArray_0.16.3     scales_1.1.1            msigdbr_7.2.1           DBI_1.1.1              
+ [45] miniUI_0.1.1.1          Rcpp_1.0.6              htmlTable_2.1.0         viridisLite_0.4.0      
+ [49] xtable_1.8-4            progress_1.2.2          kml_2.4.1               foreign_0.8-81         
+ [53] bit_4.0.4               Formula_1.2-4           longitudinalData_2.4.1  htmlwidgets_1.5.3      
+ [57] httr_1.4.2              ellipsis_0.3.1          pkgconfig_2.0.3         XML_3.99-0.6           
+ [61] farver_2.1.0            nnet_7.3-15             dbplyr_2.1.1            utf8_1.2.1             
+ [65] tidyselect_1.1.0        rlang_0.4.10            manipulateWidget_0.10.1 reshape2_1.4.4         
+ [69] later_1.1.0.1           munsell_0.5.0           tools_4.0.5             visNetwork_2.0.9       
+ [73] cachem_1.0.4            cli_2.4.0               generics_0.1.0          RSQLite_2.2.5          
+ [77] evaluate_0.14           stringr_1.4.0           fastmap_1.1.0           knitr_1.31             
+ [81] bit64_4.0.5             zip_2.1.1               rgl_0.105.22            purrr_0.3.4            
+ [85] clv_0.3-2.2             reactable_0.2.3         mime_0.10               xml2_1.3.2             
+ [89] compiler_4.0.5          rstudioapi_0.13         curl_4.3                png_0.1-7              
+ [93] tibble_3.1.0            tweenr_1.0.2            stringi_1.5.3           lattice_0.20-41        
+ [97] Matrix_1.3-2            vctrs_0.3.7             pillar_1.6.0            lifecycle_1.0.0        
+[101] data.table_1.14.0       bitops_1.0-6            httpuv_1.5.5            R6_2.5.0               
+[105] latticeExtra_0.6-29     promises_1.2.0.1        gridExtra_2.3           codetools_0.2-18       
+[109] MASS_7.3-53.1           assertthat_0.2.1        openssl_1.4.3           GenomeInfoDbData_1.2.4 
+[113] hms_1.0.0               rpart_4.1-15            grid_4.0.5              class_7.3-18           
+[117] rmarkdown_2.7           misc3d_0.9-0            ggforce_0.3.3           shiny_1.6.0            
+[121] base64enc_0.1-3         tinytex_0.31 
