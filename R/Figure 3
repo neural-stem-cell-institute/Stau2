@@ -102,19 +102,18 @@ comps<-list(c(11,13),c(13,15),c(15,17),c(11,17))
 cols<-8:19
 
 dft<-masterpeaks[-(which(masterpeaks$genome_location=="Intergenic")),]  #masterpeaks is Table S1
-scores<-scorer(dft,group,comps,cols,ncores=3)
-x<-data.frame(scores,ensID2SYM[rownames(score.clean)])
-colnames(x)<-c(colnames(scores),"Gene.Name")
-write.csv(x,"Scores.Table.csv") #####Scores.Table is Table S2
-colnames(scores)<-c("E11_vs_E13.ln(BF)","E13_vs_E15.ln(BF)","E15_vs_E17.ln(BF)","E11_vs_E17.ln(BF)","summed.ln(BF)") ####Table S2
-
+scores.1<-scorer(dft,group,comps,cols,ncores=3)
+scores<-data.frame(scores.1,ensID2SYM[rownames(scores.1)])
+colnames(scores)<-c(colnames(scores.1),"Gene.Name")
+#scores table is Table S2
 
 #####Fig. 3a: histogram for scores
-hist(scores$summed.ln(BF),breaks=101)
-hist(scores$summed.ln(BF),breaks=1001)
+
 p<-ggplot(aes(x=summed.ln(BF)), data=scores)
 p<- p+geom_histogram(binwidth=0.5, color="black", fill="gray")
 p<-p + scale_x_continuous(breaks=seq(-5,30,1))
+p
+
 
 #3C-F: biological process and pathway enrichment of cargo genes
 
