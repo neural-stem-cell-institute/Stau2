@@ -94,8 +94,10 @@ unique(ensID2SYM)[1:5]
 ensID2SYM<-ensID2SYM[-(which(duplicated(names(ensID2SYM))))]
 ensID2ent<-ensID2ent[-(which(duplicated(names(ensID2ent))))]
 
-
-dft<-test[-(which(masterpeaks$genome_location=="Intergenic")),]  #masterpeaks is Table S1
+library(BayesFactor)
+library(weights)
+library(doParallel)
+dft<-masterpeaks[-(which(masterpeaks$genome_location=="Intergenic")),]  #masterpeaks is Table S1
 scores<-scorer(dft,group,comps,cols,ncores=3)
 x<-data.frame(scores,ensID2SYM[rownames(score.clean)])
 colnames(x)<-c(colnames(scores),"Gene.Name")
