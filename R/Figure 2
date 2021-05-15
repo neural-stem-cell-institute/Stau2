@@ -72,6 +72,7 @@ dev.off()
 REACTOME <- msigdb_gsets(species="Mus musculus", category="C2", subcategory="CP:REACTOME")
 GOBP <- msigdb_gsets(species="Mus musculus", category="C5", subcategory="BP")
 
+######use scores file generated in Fig.3 code or masterpeaks$gene_symbol
 all.bp<- hypeR(scores$Gene.Name, GOBP, background=55487, fdr=0.01)
 all.path<-hypeR(scores$Gene.Name, REACTOME, background=55487, fdr=0.01)
 
@@ -127,7 +128,7 @@ hyp_plot2<-function(dfa,top=15,main="Top Categories",fills=c("black","gray")){
   p1<- p1 + labs(title=main) + theme(plot.title=element_text(hjust=0)) +xlab("log(FDR)")
   p1
 }
-
+###replace pvalues/fdrs=0 in all.bp$data and all.path$data with 5e-324 (smallest number in R) for plotting
 pdf(file="Stau2_all_plots.pdf",onefile=T,paper="letter",width=7.5,height=10)
 hyp_plot2(all.path,main="Top Signaling Pathways for All Genes")
 hyp_plot2(all.bp,main="Top GO:BP categories for All Genes")
