@@ -139,8 +139,8 @@ p1
 library(dplyr)
 #Rename column 1 of masterpeaks_wm as "Gene.Name"
 colnames (on_genes)<-"Gene.Name"
-on_data_wm<-inner_join(on_genes, wm, by="Gene.Name")
-#add BFs from Table S2
+on_data_wm<-inner_join(on_genes, masterpeaks_wm, by="Gene.Name")
+
 
 z_on<- data.frame (t(apply (on_data_wm[,2:13], 1, function(x)(x-mean(x))/sd(x))), row.names = on_data_wm$Gene.Name)
 z_on<-setDT(z_on, keep.rownames = "Gene.Name")[]
@@ -156,7 +156,7 @@ z_on_bf<- z_on_bf[which(z_on_bf$Summed.BF>1.163),] #dynamic+partially dynamic ge
 library(superheat)
 library(RColorBrewer)
 ###generate heatmap with clustering #use rowmeans columns 
-superheat.z.on.means.bf.clustered<- superheat(z_on_bf[,19:22], n.clusters.rows = 2, 
+superheat.z.on.means.bf.clustered<- superheat(z_on_bf[,20:23], n.clusters.rows = 2, 
  clustering.method="hierarchical",left.label.size=0.3, left.label.text.size = 2.5, bottom.label.text.size = 3, 
       pretty.order.rows = TRUE,left.label = "variable", heat.pal = rev(brewer.pal(11,"RdYlBu")), 
       yr = z_on_bf$Summed.BF,  yr.plot.type = "bar", yr.axis.name = "ln(BF)")
