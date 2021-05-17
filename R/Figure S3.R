@@ -8,6 +8,7 @@ RP<-read.delim("ReactomePathways.txt",as.is=T,header=F)  #Table S13a
 RP<-RP[grep("Mus",RP[,3]),] #Reactome pathways for mus musculus
 rownames(RP)<-RP$V1
 #use dynamic, partially dynamic, and stable pathways generated in Fig. 3 code
+t1.path.2<- t1.path$data
 dynx<-foreach(i=1:223,.combine='rbind') %do% { #223- number of pathways
   x<-t1.path.2[i,]
   x$Cluster<-i-1
@@ -65,6 +66,7 @@ dynx$rootName<-RP[x,]$V2 #rootName- parent pathway name
 table(dynx$rootName) #table showing parent pathway names and number of second tier pathways (sub-pathways)
 
 #Repeat for stable pathways
+s1.path.2<- s1.path$data
 stabx<-foreach(i=1:605,.combine='rbind') %do% { #605- number of pathways
   x<-s1.path.2[i,]
   x$Cluster<-i-1
@@ -97,6 +99,7 @@ stabx$rootPath<-x #rootPath- parent pathway identifer
 stabx$rootName<-RP[x,]$V2 #rootName- parent pathway name
 table(stabx$rootName) #table showing parent pathway names and number of second tier pathways (sub-pathways)
 #repeat for partially dynamic
+p1.path.2<- p1.path$data
 par.dynx<-foreach(i=1:629,.combine='rbind') %do% { #629- number of pathways
   x<-p1.path.2[i,]
   x$Cluster<-i-1
