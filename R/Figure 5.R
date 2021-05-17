@@ -113,10 +113,6 @@ zz<-foreach(i=1:length(rownames(yy)),.combine='rbind') %do% {
   p
 } 
 
-
-rownames(zz)<-rownames(yy)
-
-
 #apply weights from layer markers file to layer marker genes in my data
 yszz<-foreach(i=1:dim(zz)[2],.combine='rbind') %do% {
   z1<-zz[,i]
@@ -129,12 +125,11 @@ colnames(yszz)<-c("L2/3/4","L5/6")
 rownames(yszz)<-colnames(zz)
 
 # for plotting
+  library(reshape2)
 yszz_df<-data.frame(yszz)
 yszz_plot<- melt(yszz_df)
 yszz_plot$timepoint<- c(11,11,11,13,13,13, 15,15,15,17,17,17)
 colnames (yszz_plot)[1]<- "Layer"
-library(reshape2)
-
 
 library(ggplot2)
 p<-ggplot(aes(timepoint,value),data=yszz_plot)
