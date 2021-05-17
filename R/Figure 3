@@ -142,16 +142,16 @@ p1.path<-hypeR(p1, REACTOME, background=55487, fdr=0.01)
 p1.bp<- hypeR(p1, GOBP, background=55487, fdr=0.01)
 
 
-write.csv(t1.path,"Decisively_Dynamic_pathways.csv")
-write.csv(t1.bp,"Decisively_Dynamic_GOBP.csv")
+write.csv(t1.path$data,"Decisively_Dynamic_pathways.csv")
+write.csv(t1.bp$data,"Decisively_Dynamic_GOBP.csv")
 
 
-write.csv(p1.path,"Partially_Dynamic_pathways.csv")
-write.csv(p1.bp,"Partially_Dynamic_GOBP.csv")
+write.csv(p1.path$data,"Partially_Dynamic_pathways.csv")
+write.csv(p1.bp$data,"Partially_Dynamic_GOBP.csv")
 
 
-write.csv(s1.path,"Stable_pathways.csv")
-write.csv(s1.bp,"Stable_GOBP.csv")
+write.csv(s1.path$data,"Stable_pathways.csv")
+write.csv(s1.bp$data,"Stable_GOBP.csv")
 
 #plotting bar graphs
 pdf(file="Stau2_dyn_stab_plots.pdf",onefile=T,paper="letter",width=7.5,height=10)
@@ -236,19 +236,19 @@ write.csv(stab.treemap$data, "stable_treemap_data.csv")
 ######Fig. 3E,F
 ##### first calculate weighted means from masterpeaks file (peak count data)
 masterpeaks <- data.frame (read.csv("MasterPeaks.csv"), as.is=T) #masterpeaks=Table S1
-ids<-unique(as.character(masterpeaks$Gene.Name)) #masterpeaks$gene_symbol
+ids<-unique(as.character(masterpeaks$gene_symbol))
 if(length(which(is.na(ids)))>=1) {ids<-ids[-(which(is.na(ids)))] }
 
 timepoints<- c(1,2,3,4,5,6,7,8,9,10,11,12)# 1,2,3,etc correspond to E11 replicates E11.1, E11.2, E11.3 and so on
 library(foreach)
 
-mastepeaks_wm<-foreach(i=1:length(ids),.combine="rbind") %do% {
+masterpeaks_wm<-foreach(i=1:length(ids),.combine="rbind") %do% {
   mat2<-masterpeaks[which(as.character(masterpeaks$gene_symbol)==ids[i]),]
   if(dim(mat2)[1]>1){
     wgt<-ecdf(0:max(mat2$Peak.Score)) 
     wgt<-sapply(mat2$Peak.Score,wgt) #apply the wgt from the ecdf function to the peak scores
   } else {wgt<-1}
-  mat1<- mat2[,8:19] #dataframe containing E11-E17 gene values/counts
+  mat1<- mat2[,9:20] #dataframe containing E11-E17 gene values/counts
   if(dim(mat2)[1]>1){ 
     weight.mean<-foreach (j=1:12, .combine="c") %do% {
       mat3<- mat1[,which(timepoints==j)]
@@ -259,18 +259,17 @@ mastepeaks_wm<-foreach(i=1:length(ids),.combine="rbind") %do% {
 }
 rownames (masterpeaks_wm)<- ids
 colnames (masterpeaks_wm)<- c("E11.1", "E11.2", "E11.3", "E13.1", "E13.2", "E13.3", "E15.1", "E15.2", "E15.3", 
-                  "E17.1", "E17.2", "E17.3")
-
+                              "E17.1", "E17.2", "E17.3")
+masterpeaks_wm<- data.frame(masterpeaks_wm)
+masterpeaks_wm<-data.frame(setDT(masterpeaks_wm, keep.rownames = "Gene.Name")[])
 masterpeaks_wm$E11.mean<- rowMeans(masterpeaks_wm[2:4],)
 masterpeaks_wm$E13.mean<- rowMeans(masterpeaks_wm[5:7],)
 masterpeaks_wm$E15.mean<- rowMeans(masterpeaks_wm[8:10],)
 masterpeaks_wm$E17.mean<- rowMeans(masterpeaks_wm[11:13],)
 
-
-######get the timepoint at which each gene is maximally bound (only dynamic and partially dynamic genes)
 masterpeaks_wm$max <- apply(masterpeaks_wm[,14:17], 1, max)
 
-scores.2<-scores[!duplicated(scores$Gene.Name),] ####check for duplications
+scores.2<-scores[!duplicated(scores$Gene.Name),] #check for duplications
 masterpeaks_wm_scores<- inner_join(masterpeaks_wm,scores.2, by="Gene.Name")
 masterpeaks_wm_dyn<- masterpeaks_wm_scores[which(masterpeaks_wm_scores$Summed.BF>=1.163),]
 
